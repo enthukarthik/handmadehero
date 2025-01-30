@@ -455,3 +455,4 @@ dkms.conf
 
 #Handmade Hero specific
 build/
+.vscode/
