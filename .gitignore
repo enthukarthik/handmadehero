@@ -452,3 +452,7 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+#Handmade Hero specific
+build/
+.vscode/
