@@ -4,7 +4,7 @@ REM Switch to build directory and then build to get build artifacts in the 'buil
 pushd ..\build
 
 REM /Zi enables debug information
-cl /Zi ..\code\win32_handmade.cpp user32.lib
+cl /Zi ..\code\win32_handmade.cpp user32.lib gdi32.lib
 
 REM pop the last pushed directory
 popd

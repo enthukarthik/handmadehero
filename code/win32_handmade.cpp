@@ -13,6 +13,21 @@ LRESULT Wndproc(
             OutputDebugString(TEXT("Window created\n"));
             break;
 
+        case WM_PAINT:
+            {
+                PAINTSTRUCT paint_struct;
+                HDC windowDC = BeginPaint(hWnd, &paint_struct);
+                
+                int x = paint_struct.rcPaint.left;
+                int y = paint_struct.rcPaint.top;
+                int window_height = paint_struct.rcPaint.bottom - paint_struct.rcPaint.top;
+                int window_width = paint_struct.rcPaint.right - paint_struct.rcPaint.left;
+                PatBlt(windowDC, x, y, window_width, window_height, PATINVERT);
+
+                EndPaint(hWnd, &paint_struct);
+            }
+            break;
+
         case WM_CLOSE:
             // This will add WM_DESTROY to the queue
             OutputDebugString(TEXT("Close button is pressed\n"));
@@ -62,13 +77,14 @@ int WinMain(
         if(hhWindow)
         {
             MSG msg;
-            while(GetMessage(&msg, 0, 0, 0))    // hWnd has to NULL so that all msg in the process is fetched (not window specific)
+            while(GetMessage(&msg, 0, 0, 0) > 0)    // hWnd has to NULL so that all msg in the process is fetched (not window specific)
+                                                    // > 0 since GetMessage can return -1
             {
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
             }
 
-            return msg.wParam;
+            return 0;
         }
         else
         {
