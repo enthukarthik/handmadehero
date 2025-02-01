@@ -22,7 +22,13 @@ LRESULT Wndproc(
                 int y = paint_struct.rcPaint.top;
                 int window_height = paint_struct.rcPaint.bottom - paint_struct.rcPaint.top;
                 int window_width = paint_struct.rcPaint.right - paint_struct.rcPaint.left;
-                PatBlt(windowDC, x, y, window_width, window_height, PATINVERT);
+
+                static DWORD raster_op = WHITENESS;
+                PatBlt(windowDC, x, y, window_width, window_height, raster_op);
+                if(raster_op == WHITENESS)
+                    raster_op = BLACKNESS;
+                else
+                    raster_op = WHITENESS;
 
                 EndPaint(hWnd, &paint_struct);
             }
