@@ -76,6 +76,7 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
     // Allocate and commit a new back buffer, from the virtual pages for read and write
     gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
 
+    // TODO : Without this the rendering is not happening during resizing. Not present in Casey's presentation. Need to check
     RenderColorGradient();
 }
 
