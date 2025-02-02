@@ -24,7 +24,7 @@ file_scope void RenderColorGradient()
     LONG pitch = gBitmapWidth * gBytesPerPixel;
     for(LONG row = 0; row < gBitmapHeight; ++row)
     {
-        uint8_t *pixel = each_row;
+        uint32_t *pixel = (uint32_t *)each_row;
         for(LONG col = 0; col < gBitmapWidth; ++col)
         {
             // For each row and column write a 4 byte xRGB entry
@@ -35,17 +35,15 @@ file_scope void RenderColorGradient()
             // Byte 3 = Padding
             // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the painting
 
-            *pixel = (uint8_t)col + xOffset; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black
-            pixel++;
+            uint8_t blue = (uint8_t)col + xOffset; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
+            uint8_t red = (uint8_t)row + yOffset; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
+            uint8_t green = blue ^ red;
 
-            *pixel = 0;
-            pixel++;
+            const uint8_t red_offset = 16;
+            const uint8_t green_offset = 8;
+            const uint8_t blue_offset = 0;
 
-            *pixel = (uint8_t)row + yOffset; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black
-            pixel++;
-
-            *pixel = 0;
-            pixel++;
+            *pixel++ = (uint32_t)((red << red_offset) | (green << green_offset) | (blue << blue_offset));
         }
 
         each_row += pitch;
