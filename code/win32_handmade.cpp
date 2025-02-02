@@ -10,8 +10,10 @@ file_scope LONG gBitmapWidth;
 file_scope LONG gBitmapHeight;
 file_scope WORD gBytesPerPixel = 4;
 file_scope void *gBackBuffer;
+file_scope int xOffset;
+file_scope int yOffset;
 
-file_scope void RenderColorGradient(int xOffset, int yOffset)
+file_scope void RenderColorGradient()
 {
     // Pitch : No. of pixels to move to get from one row beginning to another beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
@@ -33,13 +35,13 @@ file_scope void RenderColorGradient(int xOffset, int yOffset)
             // Byte 3 = Padding
             // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the painting
 
-            *pixel = (uint8_t)col; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black
+            *pixel = (uint8_t)col + xOffset; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black
             pixel++;
 
             *pixel = 0;
             pixel++;
 
-            *pixel = (uint8_t)row; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black
+            *pixel = (uint8_t)row + yOffset; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black
             pixel++;
 
             *pixel = 0;
@@ -73,8 +75,8 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
     size_t bitmapSizeInBytes = gBitmapWidth * gBitmapHeight * gBytesPerPixel;
     // Allocate and commit a new back buffer, from the virtual pages for read and write
     gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
-    
-    RenderColorGradient(0, 0);
+
+    RenderColorGradient();
 }
 
 file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
@@ -167,15 +169,32 @@ int WinMain(
         
         if(hhWindow)
         {
-            MSG msg;
+            gGameRunning = true;
             while (gGameRunning)
             {
-                if (GetMessage(&msg, 0, 0, 0) > 0)    // hWnd has to NULL so that all msg in the process is fetched (not window specific)
-                                                      // > 0 since GetMessage can return -1
+                MSG msg;
+                // PeekMessage won't block on the thread if no msg in the queue
+                if(PeekMessage(&msg, 0, 0, 0, PM_REMOVE))
                 {
-                    TranslateMessage(&msg);
-                    DispatchMessage(&msg);
+                    if(msg.message == WM_QUIT) // If we get this message through some other means, exit the game
+                    {
+                        gGameRunning = false;
+                    }
                 }
+
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+
+                RenderColorGradient();
+
+                RECT client_rect;
+                GetClientRect(hhWindow, &client_rect);
+
+                HDC windowDeviceContext = GetDC(hhWindow);
+                PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);
+                ReleaseDC(hhWindow, windowDeviceContext);
+
+                ++xOffset;
             }
 
             return 0;
