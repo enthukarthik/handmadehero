@@ -54,13 +54,14 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
             // Byte 2 = Red,
             // Byte 3 = Padding
             // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the painting
-            *pixel = 255;
+
+            *pixel = (uint8_t)col; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black
             pixel++;
 
             *pixel = 0;
             pixel++;
 
-            *pixel = 0;
+            *pixel = (uint8_t)row; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black
             pixel++;
 
             *pixel = 0;
