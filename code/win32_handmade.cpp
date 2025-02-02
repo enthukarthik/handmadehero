@@ -11,30 +11,8 @@ file_scope LONG gBitmapHeight;
 file_scope WORD gBytesPerPixel = 4;
 file_scope void *gBackBuffer;
 
-file_scope void CreateBackBufferForNewSize(RECT *client_rect)
+file_scope void RenderColorGradient(int xOffset, int yOffset)
 {
-    // if back buffer got already allocated in the previous WM_SIZE call, release that memory
-    if(gBackBuffer)
-    {
-        VirtualFree(gBackBuffer, 0, MEM_RELEASE);
-    }
-
-    gBitmapWidth = client_rect->right - client_rect->left;
-    gBitmapHeight = client_rect->bottom - client_rect->top;
-
-    // Allocate Device Independent Bitmap (DIB) parameters
-    gBitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    gBitmapInfo.bmiHeader.biWidth = gBitmapWidth;
-    gBitmapInfo.bmiHeader.biHeight = -gBitmapHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
-    gBitmapInfo.bmiHeader.biPlanes = 1;
-    gBitmapInfo.bmiHeader.biBitCount = gBytesPerPixel * 8; // 8 bits for each RGB and 8 bits for padding/alignment in memory
-    gBitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
-    // all others fields in the structure are zero, which is already done by virtue of the structure being global
-
-    size_t bitmapSizeInBytes = gBitmapWidth * gBitmapHeight * gBytesPerPixel;
-    // Allocate and commit a new back buffer, from the virtual pages for read and write
-    gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
-
     // Pitch : No. of pixels to move to get from one row beginning to another beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
     // Casey Muratori says that for pixel operations sometimes strides are not aligned properly at pixel boundaries
@@ -69,7 +47,34 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
         }
 
         each_row += pitch;
+    }    
+}
+
+file_scope void CreateBackBufferForNewSize(RECT *client_rect)
+{
+    // if back buffer got already allocated in the previous WM_SIZE call, release that memory
+    if(gBackBuffer)
+    {
+        VirtualFree(gBackBuffer, 0, MEM_RELEASE);
     }
+
+    gBitmapWidth = client_rect->right - client_rect->left;
+    gBitmapHeight = client_rect->bottom - client_rect->top;
+
+    // Allocate Device Independent Bitmap (DIB) parameters
+    gBitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    gBitmapInfo.bmiHeader.biWidth = gBitmapWidth;
+    gBitmapInfo.bmiHeader.biHeight = -gBitmapHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
+    gBitmapInfo.bmiHeader.biPlanes = 1;
+    gBitmapInfo.bmiHeader.biBitCount = gBytesPerPixel * 8; // 8 bits for each RGB and 8 bits for padding/alignment in memory
+    gBitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
+    // all others fields in the structure are zero, which is already done by virtue of the structure being global
+
+    size_t bitmapSizeInBytes = gBitmapWidth * gBitmapHeight * gBytesPerPixel;
+    // Allocate and commit a new back buffer, from the virtual pages for read and write
+    gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
+    
+    RenderColorGradient(0, 0);
 }
 
 file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
