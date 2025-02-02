@@ -1,4 +1,78 @@
 #include <windows.h>
+#include <stdint.h>
+
+#define file_scope static
+#define local_persist static
+
+file_scope BITMAPINFO gBitmapInfo;
+file_scope LONG gBitmapWidth;
+file_scope LONG gBitmapHeight;
+file_scope WORD gBytesPerPixel = 4;
+file_scope void *gBackBuffer;
+
+file_scope void CreateBackBufferForNewSize(RECT *client_rect)
+{
+    // if back buffer got already allocated in the previous WM_SIZE call, release that memory
+    if(gBackBuffer)
+    {
+        VirtualFree(gBackBuffer, 0, MEM_RELEASE);
+    }
+
+    gBitmapWidth = client_rect->right - client_rect->left;
+    gBitmapHeight = client_rect->bottom - client_rect->top;
+
+    // Allocate Device Independent Bitmap (DIB) parameters
+    gBitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
+    gBitmapInfo.bmiHeader.biWidth = gBitmapWidth;
+    gBitmapInfo.bmiHeader.biHeight = -gBitmapHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
+    gBitmapInfo.bmiHeader.biPlanes = 1;
+    gBitmapInfo.bmiHeader.biBitCount = gBytesPerPixel * 8; // 8 bits for each RGB and 8 bits for padding/alignment in memory
+    gBitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
+    // all others fields in the structure are zero, which is already done by virtue of the structure being global
+
+    size_t bitmapSizeInBytes = gBitmapWidth * gBitmapHeight * gBytesPerPixel;
+    // Allocate and commit a new back buffer, from the virtual pages for read and write
+    gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
+
+    uint8_t *pixel = (uint8_t *)gBackBuffer;
+    for(LONG row = 0; row < gBitmapHeight; ++row)
+    {
+        for(LONG col = 0; col < gBitmapWidth; ++col)
+        {
+            // For each row and column write a 4 byte xRGB entry
+            // Due to little endianness, 
+            // Byte 0 = Blue,
+            // Byte 1 = Green,
+            // Byte 2 = Red,
+            // Byte 3 = Padding
+            // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the painting
+            *pixel = 255;
+            pixel++;
+
+            *pixel = 0;
+            pixel++;
+
+            *pixel = 0;
+            pixel++;
+
+            *pixel = 0;
+            pixel++;
+        }
+    }
+}
+
+file_scope void PaintWindowBasedOnCurrentBackBuffer(HDC windowDC, RECT *client_rect)
+{
+    int windowWidth = client_rect->right - client_rect->left;
+    int windowHeight = client_rect->bottom - client_rect->top;
+    StretchDIBits(windowDC,
+                0, 0, windowWidth, windowHeight,        // Destination rectangle params
+                0, 0, gBitmapWidth, gBitmapHeight,      // Source rectangle params
+                gBackBuffer,        // Use this back buffer
+                &gBitmapInfo,       // Use the structure defined in this structure
+                DIB_RGB_COLORS,     // Plain RGB
+                SRCCOPY);           // Copy from source to destination
+}
 
 LRESULT Wndproc(
     HWND hWnd,
@@ -9,41 +83,28 @@ LRESULT Wndproc(
 {
     switch(uMsg)
     {
-        case WM_CREATE:
-            OutputDebugString(TEXT("Window created\n"));
+        // When the size of the window is changed
+        case WM_SIZE:
+            {
+                RECT client_rect;
+                GetClientRect(hWnd, &client_rect);
+                CreateBackBufferForNewSize(&client_rect);
+            }
             break;
 
+        // When painting request needs to be handled for the window
         case WM_PAINT:
             {
                 PAINTSTRUCT paint_struct;
                 HDC windowDC = BeginPaint(hWnd, &paint_struct);
-                
-                int x = paint_struct.rcPaint.left;
-                int y = paint_struct.rcPaint.top;
-                int window_height = paint_struct.rcPaint.bottom - paint_struct.rcPaint.top;
-                int window_width = paint_struct.rcPaint.right - paint_struct.rcPaint.left;
 
-                static DWORD raster_op = WHITENESS;
-                // Blit means copying a rectangular array of pixel from one memory to another
-                // Bit Blit (Bit Block Transfer) - raster operation of combining several bitmaps into one ... using boolean function
-                PatBlt(windowDC, x, y, window_width, window_height, raster_op);
-                if(raster_op == WHITENESS)
-                    raster_op = BLACKNESS;
-                else
-                    raster_op = WHITENESS;
+                PaintWindowBasedOnCurrentBackBuffer(windowDC, &paint_struct.rcPaint);
 
                 EndPaint(hWnd, &paint_struct);
             }
             break;
 
-        case WM_CLOSE:
-            // This will add WM_DESTROY to the queue through DefWindowProc
-            OutputDebugString(TEXT("Close button is pressed\n"));
-            break;
-
-        // WM_DESTROY msg gets passed when the close button is pressed
         case WM_DESTROY:
-            OutputDebugString(TEXT("WM_DESTROY msg processed\n"));
             PostQuitMessage(0);                         // This will post WM_QUIT msg which will exit the event loop
             break;
 
