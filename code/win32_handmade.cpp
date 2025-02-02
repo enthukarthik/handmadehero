@@ -24,6 +24,8 @@ LRESULT Wndproc(
                 int window_width = paint_struct.rcPaint.right - paint_struct.rcPaint.left;
 
                 static DWORD raster_op = WHITENESS;
+                // Blit means copying a rectangular array of pixel from one memory to another
+                // Bit Blit (Bit Block Transfer) - raster operation of combining several bitmaps into one ... using boolean function
                 PatBlt(windowDC, x, y, window_width, window_height, raster_op);
                 if(raster_op == WHITENESS)
                     raster_op = BLACKNESS;
@@ -35,7 +37,7 @@ LRESULT Wndproc(
             break;
 
         case WM_CLOSE:
-            // This will add WM_DESTROY to the queue
+            // This will add WM_DESTROY to the queue through DefWindowProc
             OutputDebugString(TEXT("Close button is pressed\n"));
             break;
 
@@ -61,6 +63,8 @@ int WinMain(
 {
     WNDCLASS wndClass {};
     wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
+                                                                // CS_HREDRAW : Redraw the entire client rect area when the width changes
+                                                                // CS_VREDRAW : Redraw the entire client rect area when the height changes
     wndClass.lpfnWndProc = Wndproc;                             // The windows proc to be called
     wndClass.hInstance   = hInstance;                           // hInstance of the module that contains the WndProc. GetModuleHandle(0) should do the same
     wndClass.lpszClassName = TEXT("HHWndClass");                // A name for this class. TEXT() to make it work for both ASCII and Unicode
