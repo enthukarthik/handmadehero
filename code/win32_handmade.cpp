@@ -4,6 +4,7 @@
 #define file_scope static
 #define local_persist static
 
+file_scope bool gGameRunning = true;
 file_scope BITMAPINFO gBitmapInfo;
 file_scope LONG gBitmapWidth;
 file_scope LONG gBitmapHeight;
@@ -34,9 +35,16 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
     // Allocate and commit a new back buffer, from the virtual pages for read and write
     gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
 
-    uint8_t *pixel = (uint8_t *)gBackBuffer;
+    // Pitch : No. of pixels to move to get from one row beginning to another beginning
+    // Stride : No of pixels to move to get from one row end to another row beginning
+    // Casey Muratori says that for pixel operations sometimes strides are not aligned properly at pixel boundaries
+    // So do the op for each row and increase the row pixel by pitch amount is the right thing to do. TODO : Need to understand it better
+
+    uint8_t *each_row = (uint8_t *)gBackBuffer;
+    LONG pitch = gBitmapWidth * gBytesPerPixel;
     for(LONG row = 0; row < gBitmapHeight; ++row)
     {
+        uint8_t *pixel = each_row;
         for(LONG col = 0; col < gBitmapWidth; ++col)
         {
             // For each row and column write a 4 byte xRGB entry
@@ -58,10 +66,12 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
             *pixel = 0;
             pixel++;
         }
+
+        each_row += pitch;
     }
 }
 
-file_scope void PaintWindowBasedOnCurrentBackBuffer(HDC windowDC, RECT *client_rect)
+file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
 {
     int windowWidth = client_rect->right - client_rect->left;
     int windowHeight = client_rect->bottom - client_rect->top;
@@ -98,21 +108,25 @@ LRESULT Wndproc(
                 PAINTSTRUCT paint_struct;
                 HDC windowDC = BeginPaint(hWnd, &paint_struct);
 
-                PaintWindowBasedOnCurrentBackBuffer(windowDC, &paint_struct.rcPaint);
+                PaintWindowFromCurrentBackBuffer(windowDC, &paint_struct.rcPaint);
 
                 EndPaint(hWnd, &paint_struct);
             }
             break;
 
+        case WM_CLOSE:
+            gGameRunning = false;                   // User pressed the close button. Give some UI popup and close the game gracefully
+            break;
+
         case WM_DESTROY:
-            PostQuitMessage(0);                         // This will post WM_QUIT msg which will exit the event loop
+            gGameRunning = false;                   // We shouldn't be getting this without our knowledge, if so we should close and recrete the game window gracefully. How to handle it?
             break;
 
         default:
-            break;
+            return DefWindowProc(hWnd, uMsg, wParam, lParam);
     }
 
-    return DefWindowProc(hWnd, uMsg, wParam, lParam);
+    return wParam;
 }
 
 int WinMain(
@@ -148,11 +162,14 @@ int WinMain(
         if(hhWindow)
         {
             MSG msg;
-            while(GetMessage(&msg, 0, 0, 0) > 0)    // hWnd has to NULL so that all msg in the process is fetched (not window specific)
-                                                    // > 0 since GetMessage can return -1
+            while (gGameRunning)
             {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                if (GetMessage(&msg, 0, 0, 0) > 0)    // hWnd has to NULL so that all msg in the process is fetched (not window specific)
+                                                      // > 0 since GetMessage can return -1
+                {
+                    TranslateMessage(&msg);
+                    DispatchMessage(&msg);
+                }
             }
 
             return 0;
