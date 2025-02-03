@@ -10,9 +10,9 @@
 typedef struct DIBBackBuffer
 {
     BITMAPINFO bbStructure;
-    void *bbMemory;
-    int32_t bbWidth;
-    int32_t bbHeight;
+    void       *bbMemory;
+    int32_t    bbWidth;
+    int32_t    bbHeight;
 } BackBuffer;
 
 typedef struct DIBAnimateOffsets
@@ -67,7 +67,7 @@ file_scope void CheckXInputState()
             int16_t lx = inputState.Gamepad.sThumbLX;
             int16_t ly = inputState.Gamepad.sThumbLY;
 
-            // Not working. Need to debug later
+            // Not working. Need to debug
             //if(lx > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
             //    xOffset -= log2(lx);
             //else if (lx < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
@@ -92,7 +92,7 @@ file_scope void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *heig
 
 file_scope void RenderColorGradient()
 {
-    // Pitch : No. of pixels to move to get from one row beginning to another beginning
+    // Pitch : No. of pixels to move to get from one row beginning to another row beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
     // Casey Muratori says that for pixel operations sometimes strides are not aligned properly at pixel boundaries
     // So do the op for each row and increase the row pixel by pitch amount is the right thing to do. TODO : Need to understand it better
@@ -143,10 +143,10 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
     // Allocate Device Independent Bitmap (DIB) parameters
     g_hhBackBuffer.bbStructure.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
     g_hhBackBuffer.bbStructure.bmiHeader.biWidth       = g_hhBackBuffer.bbWidth;
-    g_hhBackBuffer.bbStructure.bmiHeader.biHeight      = -g_hhBackBuffer.bbHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
-    g_hhBackBuffer.bbStructure.bmiHeader.biPlanes      = 1;
-    g_hhBackBuffer.bbStructure.bmiHeader.biBitCount    = 32; // 8 bits for each RGB and 8 bits for padding/alignment in memory
-    g_hhBackBuffer.bbStructure.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
+    g_hhBackBuffer.bbStructure.bmiHeader.biHeight      = -g_hhBackBuffer.bbHeight;  // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
+    g_hhBackBuffer.bbStructure.bmiHeader.biPlanes      = 1;                         // Always 1
+    g_hhBackBuffer.bbStructure.bmiHeader.biBitCount    = 32;                        // 8 bits for each RGB and 8 bits for padding/alignment in memory
+    g_hhBackBuffer.bbStructure.bmiHeader.biCompression = BI_RGB;                    // uncompressed RGB format
     // all others fields in the structure are zero, which is already done by virtue of the structure being global
 
     size_t bitmapSizeInBytes = g_hhBackBuffer.bbWidth * g_hhBackBuffer.bbHeight * g_hhBackBuffer.bbStructure.bmiHeader.biBitCount / 8;
@@ -162,12 +162,12 @@ file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect
     CalcWidthHeightFromRect(client_rect, &windowWidth, &windowHeight);
 
     StretchDIBits(windowDC,
-                0, 0, windowWidth, windowHeight,        // Destination rectangle params
+                0, 0, windowWidth, windowHeight,                            // Destination rectangle params
                 0, 0, g_hhBackBuffer.bbWidth, g_hhBackBuffer.bbHeight,      // Source rectangle params
-                g_hhBackBuffer.bbMemory,        // Use this back buffer
-                &g_hhBackBuffer.bbStructure,       // Use the structure defined in this header
-                DIB_RGB_COLORS,     // Plain RGB
-                SRCCOPY);           // Copy from source to destination
+                g_hhBackBuffer.bbMemory,                                    // Use this back buffer
+                &g_hhBackBuffer.bbStructure,                                // Use the structure defined in this header
+                DIB_RGB_COLORS,                                             // Plain RGB
+                SRCCOPY);                                                   // Copy from source to destination
 }
 
 LRESULT Wndproc(
@@ -180,6 +180,32 @@ LRESULT Wndproc(
     LRESULT result = 0;
     switch(uMsg)
     {
+        case WM_KEYDOWN:
+            {
+                bool previouslyDown = lParam & (1 << 30);                // Check the 30th bit of lparam for the previous state.     KEYDOWN (1 - Key previously down as well, 0 - Key was up). KEYUP (Always 1)
+                bool currentlyUp    = lParam & (1 << 31);                // Check the 31st bit of lparam fot the transitioned state  KEYDOWN (Always 0)                                         KEYUP (Always 1)
+
+                // Check if the currently pressed key should not have been in pressed down state before
+                //if (!previouslyDown)
+                {
+                    if (wParam == 'W')
+                        g_Offsets.Y += 8;
+
+                    if (wParam == 'S')
+                        g_Offsets.Y -= 8;
+
+                    if (wParam == 'A')
+                        g_Offsets.X += 8;
+
+                    if (wParam == 'D')
+                        g_Offsets.X -= 8;
+
+                    if (wParam == VK_ESCAPE)
+                        g_GameRunning = false;
+                }
+            }
+            break;
+
         // When painting request needs to be handled for the window
         case WM_PAINT:
             {
