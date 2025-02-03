@@ -4,14 +4,24 @@
 #define file_scope static
 #define local_persist static
 
-file_scope BITMAPINFO gBitmapInfo;
+// Device Independent Bitmap Back Buffer
+typedef struct DIBBackBuffer
+{
+    BITMAPINFO bbStructure;
+    void *bbMemory;
+    int32_t bbWidth;
+    int32_t bbHeight;
+} BackBuffer;
 
-file_scope int32_t gBitmapWidth;
-file_scope int32_t gBitmapHeight;
-file_scope int16_t gBytesPerPixel = 4;
+file_scope BackBuffer g_hhBackBuffer;
 
-file_scope bool    gGameRunning   = true;
-file_scope void *gBackBuffer;
+file_scope bool       g_GameRunning   = true;
+
+file_scope void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *height)
+{
+    *width  = client_rect->right - client_rect->left;
+    *height = client_rect->bottom - client_rect->top;
+}
 
 file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
 {
@@ -20,13 +30,13 @@ file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
     // Casey Muratori says that for pixel operations sometimes strides are not aligned properly at pixel boundaries
     // So do the op for each row and increase the row pixel by pitch amount is the right thing to do. TODO : Need to understand it better
 
-    uint8_t *each_row = (uint8_t *)gBackBuffer;
-    int32_t  pitch    = gBitmapWidth * gBytesPerPixel;
+    uint8_t *each_row = (uint8_t *)g_hhBackBuffer.bbMemory;
+    int32_t  pitch    = g_hhBackBuffer.bbWidth * g_hhBackBuffer.bbStructure.bmiHeader.biBitCount / 8;
 
-    for(int32_t row = 0; row < gBitmapHeight; ++row)
+    for(int32_t row = 0; row < g_hhBackBuffer.bbHeight; ++row)
     {
         uint32_t *pixel = (uint32_t *)each_row;
-        for(int32_t col = 0; col < gBitmapWidth; ++col)
+        for(int32_t col = 0; col < g_hhBackBuffer.bbWidth; ++col)
         {
             // For each row and column write a 4 byte xRGB entry
             // Due to little endianness, 
@@ -36,9 +46,11 @@ file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
             // Byte 3 = Padding
             // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the paint32_ting
 
-            uint8_t blue  = (uint8_t)col + xOffset; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
-            uint8_t red   = (uint8_t)row + yOffset; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
+            uint8_t blue  = (uint8_t)(col + xOffset); // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
+            uint8_t red   = (uint8_t)(row + yOffset); // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
+            // Trying some random things to the green channel
             uint8_t green = blue ^ red;
+            green = green + green;
 
             const uint8_t red_offset   = 16;
             const uint8_t green_offset = 8;
@@ -54,38 +66,39 @@ file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
 file_scope void CreateBackBufferForNewSize(RECT *client_rect)
 {
     // if back buffer got already allocated in the previous WM_SIZE call, release that memory
-    if(gBackBuffer)
+    if(g_hhBackBuffer.bbMemory)
     {
-        VirtualFree(gBackBuffer, 0, MEM_RELEASE);
+        VirtualFree(g_hhBackBuffer.bbMemory, 0, MEM_RELEASE);
     }
 
-    gBitmapWidth  = client_rect->right - client_rect->left;
-    gBitmapHeight = client_rect->bottom - client_rect->top;
+    CalcWidthHeightFromRect(client_rect, &g_hhBackBuffer.bbWidth, &g_hhBackBuffer.bbHeight);
 
     // Allocate Device Independent Bitmap (DIB) parameters
-    gBitmapInfo.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
-    gBitmapInfo.bmiHeader.biWidth       = gBitmapWidth;
-    gBitmapInfo.bmiHeader.biHeight      = -gBitmapHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
-    gBitmapInfo.bmiHeader.biPlanes      = 1;
-    gBitmapInfo.bmiHeader.biBitCount    = gBytesPerPixel * 8; // 8 bits for each RGB and 8 bits for padding/alignment in memory
-    gBitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
+    g_hhBackBuffer.bbStructure.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    g_hhBackBuffer.bbStructure.bmiHeader.biWidth       = g_hhBackBuffer.bbWidth;
+    g_hhBackBuffer.bbStructure.bmiHeader.biHeight      = -g_hhBackBuffer.bbHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
+    g_hhBackBuffer.bbStructure.bmiHeader.biPlanes      = 1;
+    g_hhBackBuffer.bbStructure.bmiHeader.biBitCount    = 32; // 8 bits for each RGB and 8 bits for padding/alignment in memory
+    g_hhBackBuffer.bbStructure.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
     // all others fields in the structure are zero, which is already done by virtue of the structure being global
 
-    size_t bitmapSizeInBytes = gBitmapWidth * gBitmapHeight * gBytesPerPixel;
+    size_t bitmapSizeInBytes = g_hhBackBuffer.bbWidth * g_hhBackBuffer.bbHeight * g_hhBackBuffer.bbStructure.bmiHeader.biBitCount / 8;
+
     // Allocate and commit a new back buffer, from the virtual pages for read and write
-    gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
+    g_hhBackBuffer.bbMemory = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
 }
 
 file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
 {
-    int32_t windowWidth  = client_rect->right - client_rect->left;
-    int32_t windowHeight = client_rect->bottom - client_rect->top;
+    int32_t windowWidth;
+    int32_t windowHeight;
+    CalcWidthHeightFromRect(client_rect, &windowWidth, &windowHeight);
 
     StretchDIBits(windowDC,
                 0, 0, windowWidth, windowHeight,        // Destination rectangle params
-                0, 0, gBitmapWidth, gBitmapHeight,      // Source rectangle params
-                gBackBuffer,        // Use this back buffer
-                &gBitmapInfo,       // Use the structure defined in this structure
+                0, 0, g_hhBackBuffer.bbWidth, g_hhBackBuffer.bbHeight,      // Source rectangle params
+                g_hhBackBuffer.bbMemory,        // Use this back buffer
+                &g_hhBackBuffer.bbStructure,       // Use the structure defined in this header
                 DIB_RGB_COLORS,     // Plain RGB
                 SRCCOPY);           // Copy from source to destination
 }
@@ -100,15 +113,6 @@ LRESULT Wndproc(
     LRESULT result = 0;
     switch(uMsg)
     {
-        // When the size of the window is changed
-        case WM_SIZE:
-            {
-                RECT client_rect;
-                GetClientRect(hWnd, &client_rect);
-                CreateBackBufferForNewSize(&client_rect);
-            }
-            break;
-
         // When painting request needs to be handled for the window
         case WM_PAINT:
             {
@@ -122,11 +126,11 @@ LRESULT Wndproc(
             break;
 
         case WM_CLOSE:
-            gGameRunning = false;                   // User pressed the close button. Give some UI popup and close the game gracefully
+            g_GameRunning = false;                   // User pressed the close button. Give some UI popup and close the game gracefully
             break;
 
         case WM_DESTROY:
-            gGameRunning = false;                   // We shouldn't be getting this without our knowledge, if so we should close and recrete the game window gracefully. How to handle it?
+            g_GameRunning = false;                   // We shouldn't be getting this without our knowledge, if so we should close and recrete the game window gracefully. How to handle it?
             break;
 
         default:
@@ -145,9 +149,9 @@ int WinMain(
 )
 {
     WNDCLASS wndClass {};
-    // wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
-    //                                                             // CS_HREDRAW : Redraw the entire client rect area when the width changes
-    //                                                             // CS_VREDRAW : Redraw the entire client rect area when the height changes
+    wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
+                                                                // CS_HREDRAW : Redraw the entire client rect area when the width changes
+                                                                // CS_VREDRAW : Redraw the entire client rect area when the height changes
     wndClass.lpfnWndProc   = Wndproc;                             // The windows proc to be called
     wndClass.hInstance     = hInstance;                           // hInstance of the module that contains the WndProc. GetModuleHandle(0) should do the same
     wndClass.lpszClassName = TEXT("HHWndClass");                // A name for this class. TEXT() to make it work for both ASCII and Unicode
@@ -169,12 +173,18 @@ int WinMain(
         
         if(hhWindow)
         {
+            HDC windowDeviceContext = GetDC(hhWindow);
+            RECT client_rect;
+
+            GetClientRect(hhWindow, &client_rect);
+            CreateBackBufferForNewSize(&client_rect);       // Create a fixed size back buffer immediately after windows intialization for the default size
+
             int32_t xOffset = 0;
             int32_t yOffset = 0;
 
-            gGameRunning = true;
+            g_GameRunning = true;
 
-            while (gGameRunning)
+            while (g_GameRunning)
             {
                 MSG msg;
                 // PeekMessage won't block on the thread if no msg in the queue
@@ -182,26 +192,20 @@ int WinMain(
                 {
                     if(msg.message == WM_QUIT) // If we get this message through some other means, exit the game
                     {
-                        gGameRunning = false;
+                        g_GameRunning = false;
                     }
                 }
 
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
-                // Render the back buffer and paint the window
-                RenderColorGradient(xOffset, yOffset);
+                RenderColorGradient(xOffset, yOffset);                                  // Render the back buffer and paint the window
+                GetClientRect(hhWindow, &client_rect);                                  // Find the new size of the window
+                PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);    // Render the fixed size back buffer in the new sized window
 
-                RECT client_rect;
-                GetClientRect(hhWindow, &client_rect);
-
-                HDC windowDeviceContext = GetDC(hhWindow);
-
-                PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);
-
-                ReleaseDC(hhWindow, windowDeviceContext);
-
+                // Move the offsets to animate the buffer
                 ++xOffset;
+                yOffset *= 2;
             }
 
             return 0;
