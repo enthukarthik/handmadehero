@@ -4,14 +4,16 @@
 #define file_scope static
 #define local_persist static
 
-file_scope bool gGameRunning = true;
 file_scope BITMAPINFO gBitmapInfo;
-file_scope LONG gBitmapWidth;
-file_scope LONG gBitmapHeight;
-file_scope WORD gBytesPerPixel = 4;
+
+file_scope int32_t gBitmapWidth;
+file_scope int32_t gBitmapHeight;
+file_scope int16_t gBytesPerPixel = 4;
+
+file_scope bool    gGameRunning   = true;
 file_scope void *gBackBuffer;
 
-file_scope void RenderColorGradient(int xOffset, int yOffset)
+file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
 {
     // Pitch : No. of pixels to move to get from one row beginning to another beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
@@ -19,11 +21,12 @@ file_scope void RenderColorGradient(int xOffset, int yOffset)
     // So do the op for each row and increase the row pixel by pitch amount is the right thing to do. TODO : Need to understand it better
 
     uint8_t *each_row = (uint8_t *)gBackBuffer;
-    LONG pitch = gBitmapWidth * gBytesPerPixel;
-    for(LONG row = 0; row < gBitmapHeight; ++row)
+    int32_t  pitch    = gBitmapWidth * gBytesPerPixel;
+
+    for(int32_t row = 0; row < gBitmapHeight; ++row)
     {
         uint32_t *pixel = (uint32_t *)each_row;
-        for(LONG col = 0; col < gBitmapWidth; ++col)
+        for(int32_t col = 0; col < gBitmapWidth; ++col)
         {
             // For each row and column write a 4 byte xRGB entry
             // Due to little endianness, 
@@ -31,15 +34,15 @@ file_scope void RenderColorGradient(int xOffset, int yOffset)
             // Byte 1 = Green,
             // Byte 2 = Red,
             // Byte 3 = Padding
-            // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the painting
+            // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the paint32_ting
 
-            uint8_t blue = (uint8_t)col + xOffset; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
-            uint8_t red = (uint8_t)row + yOffset; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
+            uint8_t blue  = (uint8_t)col + xOffset; // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
+            uint8_t red   = (uint8_t)row + yOffset; // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
             uint8_t green = blue ^ red;
 
-            const uint8_t red_offset = 16;
+            const uint8_t red_offset   = 16;
             const uint8_t green_offset = 8;
-            const uint8_t blue_offset = 0;
+            const uint8_t blue_offset  = 0;
 
             *pixel++ = (uint32_t)((red << red_offset) | (green << green_offset) | (blue << blue_offset));
         }
@@ -56,15 +59,15 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
         VirtualFree(gBackBuffer, 0, MEM_RELEASE);
     }
 
-    gBitmapWidth = client_rect->right - client_rect->left;
+    gBitmapWidth  = client_rect->right - client_rect->left;
     gBitmapHeight = client_rect->bottom - client_rect->top;
 
     // Allocate Device Independent Bitmap (DIB) parameters
-    gBitmapInfo.bmiHeader.biSize = sizeof(BITMAPINFOHEADER);
-    gBitmapInfo.bmiHeader.biWidth = gBitmapWidth;
-    gBitmapInfo.bmiHeader.biHeight = -gBitmapHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
-    gBitmapInfo.bmiHeader.biPlanes = 1;
-    gBitmapInfo.bmiHeader.biBitCount = gBytesPerPixel * 8; // 8 bits for each RGB and 8 bits for padding/alignment in memory
+    gBitmapInfo.bmiHeader.biSize        = sizeof(BITMAPINFOHEADER);
+    gBitmapInfo.bmiHeader.biWidth       = gBitmapWidth;
+    gBitmapInfo.bmiHeader.biHeight      = -gBitmapHeight; // if biHeight is positive it's considered as bottom-up DIB, otherwise top-down DIB
+    gBitmapInfo.bmiHeader.biPlanes      = 1;
+    gBitmapInfo.bmiHeader.biBitCount    = gBytesPerPixel * 8; // 8 bits for each RGB and 8 bits for padding/alignment in memory
     gBitmapInfo.bmiHeader.biCompression = BI_RGB; // uncompressed RGB format
     // all others fields in the structure are zero, which is already done by virtue of the structure being global
 
@@ -75,8 +78,9 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
 
 file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
 {
-    int windowWidth = client_rect->right - client_rect->left;
-    int windowHeight = client_rect->bottom - client_rect->top;
+    int32_t windowWidth  = client_rect->right - client_rect->left;
+    int32_t windowHeight = client_rect->bottom - client_rect->top;
+
     StretchDIBits(windowDC,
                 0, 0, windowWidth, windowHeight,        // Destination rectangle params
                 0, 0, gBitmapWidth, gBitmapHeight,      // Source rectangle params
@@ -144,8 +148,8 @@ int WinMain(
     // wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
     //                                                             // CS_HREDRAW : Redraw the entire client rect area when the width changes
     //                                                             // CS_VREDRAW : Redraw the entire client rect area when the height changes
-    wndClass.lpfnWndProc = Wndproc;                             // The windows proc to be called
-    wndClass.hInstance   = hInstance;                           // hInstance of the module that contains the WndProc. GetModuleHandle(0) should do the same
+    wndClass.lpfnWndProc   = Wndproc;                             // The windows proc to be called
+    wndClass.hInstance     = hInstance;                           // hInstance of the module that contains the WndProc. GetModuleHandle(0) should do the same
     wndClass.lpszClassName = TEXT("HHWndClass");                // A name for this class. TEXT() to make it work for both ASCII and Unicode
 
     if(RegisterClass(&wndClass))
@@ -165,9 +169,11 @@ int WinMain(
         
         if(hhWindow)
         {
-            int xOffset = 0;
-            int yOffset = 0;
+            int32_t xOffset = 0;
+            int32_t yOffset = 0;
+
             gGameRunning = true;
+            
             while (gGameRunning)
             {
                 MSG msg;
