@@ -15,9 +15,74 @@ typedef struct DIBBackBuffer
     int32_t bbHeight;
 } BackBuffer;
 
-file_scope BackBuffer g_hhBackBuffer;
+typedef struct DIBAnimateOffsets
+{
+    int X;
+    int Y;
+} AnimateOffsets;
+
+file_scope BackBuffer     g_hhBackBuffer;
+file_scope AnimateOffsets g_Offsets;
 
 file_scope bool       g_GameRunning   = true;
+
+file_scope void CheckXInputState()
+{
+    for(int32_t controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
+    {
+        XINPUT_STATE inputState;
+        ZeroMemory(&inputState, sizeof(XINPUT_STATE));
+
+        int32_t xinputResult = XInputGetState(controllerIndex, &inputState);
+
+        if(xinputResult == ERROR_SUCCESS) // Controller is connected
+        {
+            bool dPadUp      = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP;
+            bool dPadDown    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN;
+            bool dPadLeft    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
+            bool dPadRight   = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
+            bool buttonStart = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_START;
+            bool buttonBack  = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_BACK;
+            bool buttonA     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_A;
+            bool buttonB     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_B;
+            bool buttonX     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_X;
+            bool buttonY     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y;
+
+            // Move the offsets to animate the buffer
+            if(dPadUp)
+                g_Offsets.Y += 2;
+
+            if(dPadDown)
+                g_Offsets.Y -= 2;
+
+            if(dPadLeft)
+                g_Offsets.X += 2;
+
+            if(dPadRight)
+                g_Offsets.X -= 2;
+
+            if (buttonB)
+                g_GameRunning = false;
+
+            int16_t lx = inputState.Gamepad.sThumbLX;
+            int16_t ly = inputState.Gamepad.sThumbLY;
+
+            // Not working. Need to debug later
+            //if(lx > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+            //    xOffset -= log2(lx);
+            //else if (lx < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+            //    xOffset += log2(lx);
+
+            //if(ly > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+            //    yOffset -= log2(ly);
+            //else if (ly < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+            //    yOffset += log2(ly);
+
+            g_Offsets.X += lx >> 12;
+            g_Offsets.Y += ly >> 12;
+        }
+    }    
+}
 
 file_scope void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *height)
 {
@@ -25,7 +90,7 @@ file_scope void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *heig
     *height = client_rect->bottom - client_rect->top;
 }
 
-file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
+file_scope void RenderColorGradient()
 {
     // Pitch : No. of pixels to move to get from one row beginning to another beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
@@ -48,8 +113,8 @@ file_scope void RenderColorGradient(int32_t xOffset, int32_t yOffset)
             // Byte 3 = Padding
             // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the paint32_ting
 
-            uint8_t blue  = (uint8_t)(col + xOffset); // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
-            uint8_t red   = (uint8_t)(row + yOffset); // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
+            uint8_t blue  = (uint8_t)(col + g_Offsets.X); // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
+            uint8_t red   = (uint8_t)(row + g_Offsets.Y); // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
             // Trying some random things to the green channel
             uint8_t green = blue ^ red;
             green = green + green;
@@ -151,12 +216,12 @@ int WinMain(
 )
 {
     WNDCLASS wndClass {};
-    wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
-                                                                // CS_HREDRAW : Redraw the entire client rect area when the width changes
-                                                                // CS_VREDRAW : Redraw the entire client rect area when the height changes
+    wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;    // CS_OWNDC : Allocate own DC for every window created through this class
+                                                                  // CS_HREDRAW : Redraw the entire client rect area when the width changes
+                                                                  // CS_VREDRAW : Redraw the entire client rect area when the height changes
     wndClass.lpfnWndProc   = Wndproc;                             // The windows proc to be called
     wndClass.hInstance     = hInstance;                           // hInstance of the module that contains the WndProc. GetModuleHandle(0) should do the same
-    wndClass.lpszClassName = TEXT("HHWndClass");                // A name for this class. TEXT() to make it work for both ASCII and Unicode
+    wndClass.lpszClassName = TEXT("HHWndClass");                  // A name for this class. TEXT() to make it work for both ASCII and Unicode
 
     if(RegisterClass(&wndClass))
     {
@@ -166,8 +231,8 @@ int WinMain(
                             WS_OVERLAPPEDWINDOW | WS_VISIBLE,
                             CW_USEDEFAULT,
                             CW_USEDEFAULT,
-                            CW_USEDEFAULT,
-                            CW_USEDEFAULT,
+                            1680,                                       // First back buffer will be created based on this width
+                            1050,                                       // and height
                             0,
                             0,
                             hInstance,
@@ -202,63 +267,9 @@ int WinMain(
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
-                for(int32_t controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
-                {
-                    XINPUT_STATE inputState;
-                    ZeroMemory(&inputState, sizeof(XINPUT_STATE));
+                CheckXInputState();
 
-                    xinputResult = XInputGetState(controllerIndex, &inputState);
-
-                    if(xinputResult == ERROR_SUCCESS) // Controller is connected
-                    {
-                        bool dPadUp      = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP;
-                        bool dPadDown    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN;
-                        bool dPadLeft    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
-                        bool dPadRight   = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
-                        bool buttonStart = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_START;
-                        bool buttonBack  = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_BACK;
-                        bool buttonA     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_A;
-                        bool buttonB     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_B;
-                        bool buttonX     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_X;
-                        bool buttonY     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y;
-
-                        // Move the offsets to animate the buffer
-                        if(dPadUp)
-                            yOffset += 2;
-
-                        if(dPadDown)
-                            yOffset -= 2;
-
-                        if(dPadLeft)
-                            xOffset += 2;
-
-                        if(dPadRight)
-                            xOffset -= 2;
-
-                        if (buttonB)
-                            g_GameRunning = false;
-
-                        int16_t lx = inputState.Gamepad.sThumbLX;
-                        int16_t ly = inputState.Gamepad.sThumbLY;
-
-                        // Not working. Need to debug later
-                        //if(lx > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
-                        //    xOffset -= log2(lx);
-                        //else if (lx < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
-                        //    xOffset += log2(lx);
-
-
-                        //if(ly > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
-                        //    yOffset -= log2(ly);
-                        //else if (ly < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
-                        //    yOffset += log2(ly);
-
-                        xOffset += lx >> 12;
-                        yOffset += ly >> 12;
-                    }
-                }
-
-                RenderColorGradient(xOffset, yOffset);                                  // Render the back buffer and paint the window
+                RenderColorGradient();                                                  // Render the back buffer and paint the window
                 GetClientRect(hhWindow, &client_rect);                                  // Find the new size of the window
                 PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);    // Render the fixed size back buffer in the new sized window
             }
