@@ -65,8 +65,14 @@ file_scope void CheckXInputDllAvailability()
     // If valid handle, load the required functions
     if (xinputLib)
     {
-        MyXInputGetState = (XInputGetStatePtr *)GetProcAddress(xinputLib, "XInputGetState"); // We know for sure that these function exists, so not checking the return value
-        MyXInputSetState = (XInputSetStatePtr *)GetProcAddress(xinputLib, "XInputSetState");
+        void *getFn = GetProcAddress(xinputLib, "XInputGetState");
+        void *setFn = GetProcAddress(xinputLib, "XInputSetState");
+
+        if(getFn)
+            MyXInputGetState = (XInputGetStatePtr *)getFn;
+
+        if(setFn)    
+            MyXInputSetState = (XInputSetStatePtr *)setFn;
     }
 }
 
