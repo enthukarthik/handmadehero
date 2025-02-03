@@ -10,10 +10,8 @@ file_scope LONG gBitmapWidth;
 file_scope LONG gBitmapHeight;
 file_scope WORD gBytesPerPixel = 4;
 file_scope void *gBackBuffer;
-file_scope int xOffset;
-file_scope int yOffset;
 
-file_scope void RenderColorGradient()
+file_scope void RenderColorGradient(int xOffset, int yOffset)
 {
     // Pitch : No. of pixels to move to get from one row beginning to another beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
@@ -73,9 +71,6 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
     size_t bitmapSizeInBytes = gBitmapWidth * gBitmapHeight * gBytesPerPixel;
     // Allocate and commit a new back buffer, from the virtual pages for read and write
     gBackBuffer = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
-
-    // TODO : Without this the rendering is not happening during resizing. Not present in Casey's presentation. Need to check
-    RenderColorGradient();
 }
 
 file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
@@ -98,6 +93,7 @@ LRESULT Wndproc(
     LPARAM lParam
 )
 {
+    LRESULT result = 0;
     switch(uMsg)
     {
         // When the size of the window is changed
@@ -130,10 +126,11 @@ LRESULT Wndproc(
             break;
 
         default:
-            return DefWindowProc(hWnd, uMsg, wParam, lParam);
+            result = DefWindowProc(hWnd, uMsg, wParam, lParam);
+            break;
     }
 
-    return wParam;
+    return result;
 }
 
 int WinMain(
@@ -144,9 +141,9 @@ int WinMain(
 )
 {
     WNDCLASS wndClass {};
-    wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
-                                                                // CS_HREDRAW : Redraw the entire client rect area when the width changes
-                                                                // CS_VREDRAW : Redraw the entire client rect area when the height changes
+    // wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;  // CS_OWNDC : Allocate own DC for every window created through this class
+    //                                                             // CS_HREDRAW : Redraw the entire client rect area when the width changes
+    //                                                             // CS_VREDRAW : Redraw the entire client rect area when the height changes
     wndClass.lpfnWndProc = Wndproc;                             // The windows proc to be called
     wndClass.hInstance   = hInstance;                           // hInstance of the module that contains the WndProc. GetModuleHandle(0) should do the same
     wndClass.lpszClassName = TEXT("HHWndClass");                // A name for this class. TEXT() to make it work for both ASCII and Unicode
@@ -168,6 +165,8 @@ int WinMain(
         
         if(hhWindow)
         {
+            int xOffset = 0;
+            int yOffset = 0;
             gGameRunning = true;
             while (gGameRunning)
             {
@@ -184,7 +183,7 @@ int WinMain(
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
-                RenderColorGradient();
+                RenderColorGradient(xOffset, yOffset);
 
                 RECT client_rect;
                 GetClientRect(hhWindow, &client_rect);
