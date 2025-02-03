@@ -205,7 +205,7 @@ int WinMain(
 
                 // Move the offsets to animate the buffer
                 ++xOffset;
-                yOffset *= 2;
+                yOffset += 2;
             }
 
             return 0;
