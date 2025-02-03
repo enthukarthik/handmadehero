@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <stdint.h>
+#include <Xinput.h>
 
 #define file_scope static
 #define local_persist static
@@ -175,6 +176,7 @@ int WinMain(
         {
             HDC windowDeviceContext = GetDC(hhWindow);
             RECT client_rect;
+            DWORD xinputResult;
 
             GetClientRect(hhWindow, &client_rect);
             CreateBackBufferForNewSize(&client_rect);       // Create a fixed size back buffer immediately after windows intialization for the default size
@@ -199,13 +201,40 @@ int WinMain(
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
+                for(int32_t controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
+                {
+                    XINPUT_STATE inputState;
+                    ZeroMemory(&inputState, sizeof(XINPUT_STATE));
+
+                    xinputResult = XInputGetState(controllerIndex, &inputState);
+
+                    if(xinputResult == ERROR_SUCCESS) // Controller is connected
+                    {
+                        bool dPadUp      = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_UP;
+                        bool dPadDown    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN;
+                        bool dPadLeft    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
+                        bool dPadRight   = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
+                        bool buttonStart = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_START;
+                        bool buttonBack  = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_BACK;
+                        bool buttonA     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_A;
+                        bool buttonB     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_B;
+                        bool buttonX     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_X;
+                        bool buttonY     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y;
+
+                        int16_t lx = inputState.Gamepad.sThumbLX;
+                        int16_t ly = inputState.Gamepad.sThumbLY;
+
+                        if(buttonA)
+                        {
+                            // Move the offsets to animate the buffer
+                            ++xOffset;
+                        }
+                    }
+                }
+
                 RenderColorGradient(xOffset, yOffset);                                  // Render the back buffer and paint the window
                 GetClientRect(hhWindow, &client_rect);                                  // Find the new size of the window
                 PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);    // Render the fixed size back buffer in the new sized window
-
-                // Move the offsets to animate the buffer
-                ++xOffset;
-                yOffset += 2;
             }
 
             return 0;

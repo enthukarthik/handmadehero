@@ -5,7 +5,7 @@ pushd ..\build
 
 REM /Zi enables debug information
 REM /FC Full path name in diagnostics
-cl /FC /Zi ..\code\win32_handmade.cpp user32.lib gdi32.lib
+cl /FC /Zi ..\code\win32_handmade.cpp user32.lib gdi32.lib xinput.lib
 
 REM pop the last pushed directory
 popd
