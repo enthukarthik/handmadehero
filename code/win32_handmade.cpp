@@ -1,6 +1,7 @@
 #include <windows.h>
 #include <stdint.h>
 #include <Xinput.h>
+#include <math.h>
 
 #define file_scope static
 #define local_persist static
@@ -221,14 +222,39 @@ int WinMain(
                         bool buttonX     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_X;
                         bool buttonY     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y;
 
+                        // Move the offsets to animate the buffer
+                        if(dPadUp)
+                            yOffset += 2;
+
+                        if(dPadDown)
+                            yOffset -= 2;
+
+                        if(dPadLeft)
+                            xOffset += 2;
+
+                        if(dPadRight)
+                            xOffset -= 2;
+
+                        if (buttonB)
+                            g_GameRunning = false;
+
                         int16_t lx = inputState.Gamepad.sThumbLX;
                         int16_t ly = inputState.Gamepad.sThumbLY;
 
-                        if(buttonA)
-                        {
-                            // Move the offsets to animate the buffer
-                            ++xOffset;
-                        }
+                        // Not working. Need to debug later
+                        //if(lx > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+                        //    xOffset -= log2(lx);
+                        //else if (lx < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+                        //    xOffset += log2(lx);
+
+
+                        //if(ly > XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+                        //    yOffset -= log2(ly);
+                        //else if (ly < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
+                        //    yOffset += log2(ly);
+
+                        xOffset += lx >> 12;
+                        yOffset += ly >> 12;
                     }
                 }
 
