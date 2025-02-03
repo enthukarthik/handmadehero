@@ -173,7 +173,7 @@ int WinMain(
             int32_t yOffset = 0;
 
             gGameRunning = true;
-            
+
             while (gGameRunning)
             {
                 MSG msg;
@@ -189,13 +189,16 @@ int WinMain(
                 TranslateMessage(&msg);
                 DispatchMessage(&msg);
 
+                // Render the back buffer and paint the window
                 RenderColorGradient(xOffset, yOffset);
 
                 RECT client_rect;
                 GetClientRect(hhWindow, &client_rect);
 
                 HDC windowDeviceContext = GetDC(hhWindow);
+
                 PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);
+
                 ReleaseDC(hhWindow, windowDeviceContext);
 
                 ++xOffset;
