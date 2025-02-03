@@ -26,6 +26,50 @@ file_scope AnimateOffsets g_Offsets;
 
 file_scope bool       g_GameRunning   = true;
 
+#define XINPUT_GET_STATE(fnptrname) DWORD fnptrname(DWORD dwUserIndex, XINPUT_STATE *pState)
+#define XINPUT_SET_STATE(fnptrname) DWORD fnptrname(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
+
+// Define a stub function that can be called and does nothing, in case XInput.dll not loaded into the game
+XINPUT_GET_STATE(XInputGetStateStub)
+{
+    // If we return 0, xinputResult will be considered ERROR_SUCCESS
+    // inputState is all zero (ZeroMemory call before)
+    // All XInput button pressed will return 0 in our function logic. So no action will be taken
+    return 0;
+}
+
+// Define a stub function that can be called and does nothing, in case XInput.dll not loaded into the game
+XINPUT_SET_STATE(XInputSetStateStub)
+{
+    return 0;
+}
+
+// Define two function pointers types that can point to
+//  - Stub functions by default
+//  - If we're able to load XInput.dll, then the right functions within those dlls
+typedef XINPUT_GET_STATE(XInputGetStatePtr);
+typedef XINPUT_SET_STATE(XInputSetStatePtr);
+
+// Be default point the pointers to stub function
+file_scope XInputGetStatePtr *MyXInputGetState = XInputGetStateStub;
+file_scope XInputSetStatePtr *MyXInputSetState = XInputSetStateStub;
+
+// Make the actual function calls inside our functions as calls to our function pointers
+#define XInputGetState MyXInputGetState
+#define XInputSetState MyXInputSetState
+
+file_scope void CheckXInputDllAvailability()
+{
+    HMODULE xinputLib = LoadLibrary(TEXT("XInput1_4.dll"));
+
+    // If valid handle, load the required functions
+    if (xinputLib)
+    {
+        MyXInputGetState = (XInputGetStatePtr *)GetProcAddress(xinputLib, "XInputGetState"); // We know for sure that these function exists, so not checking the return value
+        MyXInputSetState = (XInputSetStatePtr *)GetProcAddress(xinputLib, "XInputSetState");
+    }
+}
+
 file_scope void CheckXInputState()
 {
     for(int32_t controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
@@ -241,6 +285,7 @@ int WinMain(
     int       nShowCmd
 )
 {
+    CheckXInputDllAvailability();
     WNDCLASS wndClass {};
     wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;    // CS_OWNDC : Allocate own DC for every window created through this class
                                                                   // CS_HREDRAW : Redraw the entire client rect area when the width changes
