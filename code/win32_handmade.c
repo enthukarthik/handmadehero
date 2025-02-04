@@ -3,6 +3,7 @@
 #include <stdbool.h>
 #include <Xinput.h>
 #include <math.h>
+#include <stdio.h>
 
 #define file_scope static
 #define local_persist static
@@ -379,17 +380,17 @@ int WinMain(
                 LARGE_INTEGER endTickCount;
                 QueryPerformanceCounter(&endTickCount);
 
-                uint64_t elapsedMCyclesPerFrame = (endProcessorCycles - lastProcessorCycles) / (1000 * 1000);
-                int64_t elapsedTicksPerFrame    = endTickCount.QuadPart - lastTickCount.QuadPart;
-                int32_t elapsedMilliseconds     = (int32_t)(1000 * elapsedTicksPerFrame / noOfTicksPerSecond);
+                float elapsedMCyclesPerFrame = (float) (endProcessorCycles - lastProcessorCycles) / (1000.0f * 1000.0f);
+                float elapsedTicksPerFrame    = (float) (endTickCount.QuadPart - lastTickCount.QuadPart);
+                float elapsedMilliseconds     = (1000.0f * elapsedTicksPerFrame / noOfTicksPerSecond);
                 //int32_t fps                   = 1000 / elapsedMilliseconds;
-                int32_t fps                     = (int32_t) (noOfTicksPerSecond / elapsedTicksPerFrame);
+                float fps                     = 1.0f * noOfTicksPerSecond / elapsedTicksPerFrame;
 
                 lastTickCount = endTickCount;
                 lastProcessorCycles = endProcessorCycles;
 
-                char printMsg[64];
-                wsprintf(printMsg, TEXT("Metrics :: %d ms/frame,  %d fps,  %u million cycles/frame\n"), elapsedMilliseconds, fps, elapsedMCyclesPerFrame);
+                char printMsg[256];
+                sprintf(printMsg, TEXT("Metrics :: %.2f ms/frame,  %.2f fps,  %.2f million cycles/frame\n"), elapsedMilliseconds, fps, elapsedMCyclesPerFrame);
                 OutputDebugString(printMsg);
             }
 

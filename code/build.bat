@@ -8,7 +8,8 @@ REM /FC Full path name in diagnostics
 REM /Fe File name for the executable
 REM /W4 Enable warning level 4
 REM /WX Treat warnings as errors
-cl /std:c17 /W4 /WX /wd4191 /wd5045 /FC /Zi /FeHandmadeHero ..\code\win32_handmade.c user32.lib gdi32.lib
+REM /Dname #define constants
+cl /std:c17 /W4 /WX /wd4191 /wd5045 /D_CRT_SECURE_NO_WARNINGS /FC /Zi /FeHandmadeHero ..\code\win32_handmade.c user32.lib gdi32.lib
 REM C4191 : unsafe conversion from 'FARPROC' to 'XInputGetStatePtr (__cdecl *)'
 REM C5045 : Compiler will insert Spectre mitigation for memory load if /Qspectre switch specified
 
