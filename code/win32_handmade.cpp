@@ -229,6 +229,17 @@ LRESULT Wndproc(
     LRESULT result = 0;
     switch(uMsg)
     {
+        case WM_SYSKEYDOWN:
+            {
+                if(wParam == VK_F4)
+                {
+                    bool altKeyDown = lParam & (1 << 29);
+                    if(altKeyDown)
+                        g_GameRunning = false;
+                }
+            }
+            break;
+
         case WM_KEYDOWN:
             {
                 bool previouslyDown = lParam & (1 << 30);                // Check the 30th bit of lparam for the previous state.     KEYDOWN (1 - Key previously down as well, 0 - Key was up). KEYUP (Always 1)
