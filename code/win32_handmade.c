@@ -10,10 +10,11 @@
 // Device Independent Bitmap Back Buffer
 typedef struct DIBBackBuffer
 {
-    BITMAPINFO bbStructure;
     void       *bbMemory;
     int32_t    bbWidth;
     int32_t    bbHeight;
+    BITMAPINFO bbStructure;
+    u_char     padding[4];    
 } BackBuffer;
 
 typedef struct DIBAnimateOffsets
@@ -33,6 +34,8 @@ file_scope bool       g_GameRunning   = true;
 // Define a stub function that can be called and does nothing, in case XInput.dll not loaded into the game
 XINPUT_GET_STATE(XInputGetStateStub)
 {
+    UNREFERENCED_PARAMETER(dwUserIndex);
+    UNREFERENCED_PARAMETER(pState);
     // If XInput is not connected, return the device not connected
     // so that none of our code logic runs
     return ERROR_DEVICE_NOT_CONNECTED;
@@ -41,6 +44,8 @@ XINPUT_GET_STATE(XInputGetStateStub)
 // Define a stub function that can be called and does nothing, in case XInput.dll not loaded into the game
 XINPUT_SET_STATE(XInputSetStateStub)
 {
+    UNREFERENCED_PARAMETER(dwUserIndex);
+    UNREFERENCED_PARAMETER(pVibration);
     return ERROR_DEVICE_NOT_CONNECTED;
 }
 
@@ -58,25 +63,25 @@ file_scope XInputSetStatePtr *MyXInputSetState = XInputSetStateStub;
 #define XInputGetState MyXInputGetState
 #define XInputSetState MyXInputSetState
 
-file_scope void CheckXInputDllAvailability()
+file_scope void CheckXInputDllAvailability(void)
 {
     HMODULE xinputLib = LoadLibrary(TEXT("XInput1_4.dll"));
 
     // If valid handle, load the required functions
     if (xinputLib)
     {
-        void *getFn = GetProcAddress(xinputLib, "XInputGetState");
-        void *setFn = GetProcAddress(xinputLib, "XInputSetState");
+        MyXInputGetState = (XInputGetStatePtr *)GetProcAddress(xinputLib, "XInputGetState");
+        MyXInputSetState = (XInputSetStatePtr *)GetProcAddress(xinputLib, "XInputSetState");
 
-        if(getFn)
-            MyXInputGetState = (XInputGetStatePtr *)getFn;
+        if(!MyXInputGetState)
+            MyXInputGetState = XInputGetStateStub;
 
-        if(setFn)    
-            MyXInputSetState = (XInputSetStatePtr *)setFn;
+        if(!MyXInputSetState)    
+            MyXInputSetState = XInputSetStateStub;
     }
 }
 
-file_scope void CheckXInputState()
+file_scope void CheckXInputState(void)
 {
     for(int32_t controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
     {
@@ -91,12 +96,12 @@ file_scope void CheckXInputState()
             bool dPadDown    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_DOWN;
             bool dPadLeft    = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_LEFT;
             bool dPadRight   = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_DPAD_RIGHT;
-            bool buttonStart = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_START;
-            bool buttonBack  = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_BACK;
-            bool buttonA     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_A;
+            // bool buttonStart = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_START;
+            // bool buttonBack  = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_BACK;
+            // bool buttonA     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_A;
             bool buttonB     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_B;
-            bool buttonX     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_X;
-            bool buttonY     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y;
+            // bool buttonX     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_X;
+            // bool buttonY     = inputState.Gamepad.wButtons & XINPUT_GAMEPAD_Y;
 
             // Move the offsets to animate the buffer
             if(dPadUp)
@@ -140,7 +145,7 @@ file_scope void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *heig
     *height = client_rect->bottom - client_rect->top;
 }
 
-file_scope void RenderColorGradient()
+file_scope void RenderColorGradient(void)
 {
     // Pitch : No. of pixels to move to get from one row beginning to another row beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
@@ -243,8 +248,8 @@ LRESULT Wndproc(
 
         case WM_KEYDOWN:
             {
-                bool previouslyDown = lParam & (1 << 30);                // Check the 30th bit of lparam for the previous state.     KEYDOWN (1 - Key previously down as well, 0 - Key was up). KEYUP (Always 1)
-                bool currentlyUp    = lParam & (1 << 31);                // Check the 31st bit of lparam fot the transitioned state  KEYDOWN (Always 0)                                         KEYUP (Always 1)
+                //bool previouslyDown = lParam & (1 << 30);                // Check the 30th bit of lparam for the previous state.     KEYDOWN (1 - Key previously down as well, 0 - Key was up). KEYUP (Always 1)
+                //bool currentlyUp    = lParam & (1 << 31);                // Check the 31st bit of lparam fot the transitioned state  KEYDOWN (Always 0)                                         KEYUP (Always 1)
 
                 // Check if the currently pressed key should not have been in pressed down state before
                 //if (!previouslyDown)
@@ -302,6 +307,10 @@ int WinMain(
     int       nShowCmd
 )
 {
+    UNREFERENCED_PARAMETER(hPrevInstance);
+    UNREFERENCED_PARAMETER(lpCmdLine);
+    UNREFERENCED_PARAMETER(nShowCmd);
+
     CheckXInputDllAvailability();
     WNDCLASS wndClass = { 0 };
     wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;    // CS_OWNDC : Allocate own DC for every window created through this class
@@ -330,13 +339,9 @@ int WinMain(
         {
             HDC windowDeviceContext = GetDC(hhWindow);
             RECT client_rect;
-            DWORD xinputResult;
 
             GetClientRect(hhWindow, &client_rect);
             CreateBackBufferForNewSize(&client_rect);       // Create a fixed size back buffer immediately after windows intialization for the default size
-
-            int32_t xOffset = 0;
-            int32_t yOffset = 0;
 
             g_GameRunning = true;
 
