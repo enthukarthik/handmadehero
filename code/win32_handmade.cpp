@@ -32,16 +32,15 @@ file_scope bool       g_GameRunning   = true;
 // Define a stub function that can be called and does nothing, in case XInput.dll not loaded into the game
 XINPUT_GET_STATE(XInputGetStateStub)
 {
-    // If we return 0, xinputResult will be considered ERROR_SUCCESS
-    // inputState is all zero (ZeroMemory call before)
-    // All XInput button pressed will return 0 in our function logic. So no action will be taken
-    return 0;
+    // If XInput is not connected, return the device not connected
+    // so that none of our code logic runs
+    return ERROR_DEVICE_NOT_CONNECTED;
 }
 
 // Define a stub function that can be called and does nothing, in case XInput.dll not loaded into the game
 XINPUT_SET_STATE(XInputSetStateStub)
 {
-    return 0;
+    return ERROR_DEVICE_NOT_CONNECTED;
 }
 
 // Define two function pointers types that can point to
