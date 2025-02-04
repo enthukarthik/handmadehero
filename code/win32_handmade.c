@@ -1,5 +1,6 @@
 #include <windows.h>
 #include <stdint.h>
+#include <stdbool.h>
 #include <Xinput.h>
 #include <math.h>
 
@@ -302,7 +303,7 @@ int WinMain(
 )
 {
     CheckXInputDllAvailability();
-    WNDCLASS wndClass {};
+    WNDCLASS wndClass = { 0 };
     wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;    // CS_OWNDC : Allocate own DC for every window created through this class
                                                                   // CS_HREDRAW : Redraw the entire client rect area when the width changes
                                                                   // CS_VREDRAW : Redraw the entire client rect area when the height changes
