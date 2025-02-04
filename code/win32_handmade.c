@@ -133,7 +133,7 @@ file_scope void CheckXInputState(void)
             //else if (ly < -XINPUT_GAMEPAD_LEFT_THUMB_DEADZONE)
             //    yOffset += log2(ly);
 
-            g_Offsets.X += lx >> 12;
+            g_Offsets.X -= lx >> 12;
             g_Offsets.Y += ly >> 12;
         }
     }    
