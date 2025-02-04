@@ -311,6 +311,10 @@ int WinMain(
     UNREFERENCED_PARAMETER(lpCmdLine);
     UNREFERENCED_PARAMETER(nShowCmd);
 
+    LARGE_INTEGER ticksPerSecondResult;
+    QueryPerformanceFrequency(&ticksPerSecondResult);
+    int64_t noOfTicksPerSecond = ticksPerSecondResult.QuadPart;
+
     CheckXInputDllAvailability();
     WNDCLASS wndClass = { 0 };
     wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;    // CS_OWNDC : Allocate own DC for every window created through this class
@@ -345,6 +349,11 @@ int WinMain(
 
             g_GameRunning = true;
 
+            LARGE_INTEGER lastTickCount;
+            QueryPerformanceCounter(&lastTickCount);
+
+            uint64_t lastProcessorCycles = __rdtsc();
+
             while (g_GameRunning)
             {
                 MSG msg;
@@ -365,6 +374,23 @@ int WinMain(
                 RenderColorGradient();                                                  // Render the back buffer and paint the window
                 GetClientRect(hhWindow, &client_rect);                                  // Find the new size of the window
                 PaintWindowFromCurrentBackBuffer(windowDeviceContext, &client_rect);    // Render the fixed size back buffer in the new sized window
+
+                uint64_t endProcessorCycles = __rdtsc();
+                LARGE_INTEGER endTickCount;
+                QueryPerformanceCounter(&endTickCount);
+
+                uint64_t elapsedMCyclesPerFrame = (endProcessorCycles - lastProcessorCycles) / (1000 * 1000);
+                int64_t elapsedTicksPerFrame    = endTickCount.QuadPart - lastTickCount.QuadPart;
+                int32_t elapsedMilliseconds     = (int32_t)(1000 * elapsedTicksPerFrame / noOfTicksPerSecond);
+                //int32_t fps                   = 1000 / elapsedMilliseconds;
+                int32_t fps                     = (int32_t) (noOfTicksPerSecond / elapsedTicksPerFrame);
+
+                lastTickCount = endTickCount;
+                lastProcessorCycles = endProcessorCycles;
+
+                char printMsg[64];
+                wsprintf(printMsg, TEXT("Metrics :: %d ms/frame,  %d fps,  %u million cycles/frame\n"), elapsedMilliseconds, fps, elapsedMCyclesPerFrame);
+                OutputDebugString(printMsg);
             }
 
             return 0;
