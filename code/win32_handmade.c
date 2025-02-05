@@ -64,7 +64,7 @@ file_scope XInputSetStatePtr *MyXInputSetState = XInputSetStateStub;
 #define XInputGetState MyXInputGetState
 #define XInputSetState MyXInputSetState
 
-file_scope void CheckXInputDllAvailability(void)
+file_scope void GetXInputFunctions(void)
 {
     HMODULE xinputLib = LoadLibrary(TEXT("XInput1_4.dll"));
 
@@ -169,6 +169,8 @@ file_scope void RenderColorGradient(void)
             // Byte 3 = Padding
             // So when read as 4 bytes as mentioned in the BITMAPINFOHEADER it'll be read as <Padding><Red><Green><Blue> and the least 24 bits (RGB) will be used for the paint32_ting
 
+            // Offset gets added to the specified channel every frame (since we're running this function only once per frame).
+            // So if the offset value is 1 and the game running at 7 fps, around 142 (1000 by 7) pixels gets offsetted by this addition
             uint8_t blue  = (uint8_t)(col + g_Offsets.X); // Take the lower order byte from col. So the blue color gradually increases from 0 to 256 sideward and suddenly drops to black. Adding xOffset to animate
             uint8_t red   = (uint8_t)(row + g_Offsets.Y); // Take the lower order byte from row. So the red color gradually increases from 0 to 256 downward and suddenly drops to black. Add yOffset to animate
             // Trying some random things to the green channel
@@ -316,7 +318,7 @@ int WinMain(
     QueryPerformanceFrequency(&ticksPerSecondResult);
     int64_t noOfTicksPerSecond = ticksPerSecondResult.QuadPart;
 
-    CheckXInputDllAvailability();
+    GetXInputFunctions();
     WNDCLASS wndClass = { 0 };
     wndClass.style       = CS_OWNDC | CS_HREDRAW | CS_VREDRAW;    // CS_OWNDC : Allocate own DC for every window created through this class
                                                                   // CS_HREDRAW : Redraw the entire client rect area when the width changes
