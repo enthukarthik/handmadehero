@@ -5,8 +5,9 @@
 #include <math.h>
 #include <stdio.h>
 
-#define file_scope static
+#define global_var static
 #define local_persist static
+#define internal static // internal linkage, file scoped
 
 // Device Independent Bitmap Back Buffer
 typedef struct DIBBackBuffer
@@ -24,10 +25,10 @@ typedef struct DIBAnimateOffsets
     int Y;
 } AnimateOffsets;
 
-file_scope BackBuffer     g_hhBackBuffer;
-file_scope AnimateOffsets g_Offsets;
+global_var BackBuffer     g_hhBackBuffer;
+global_var AnimateOffsets g_Offsets;
 
-file_scope bool       g_GameRunning   = true;
+global_var bool       g_GameRunning   = true;
 
 #define XINPUT_GET_STATE(fnptrname) DWORD fnptrname(DWORD dwUserIndex, XINPUT_STATE *pState)
 #define XINPUT_SET_STATE(fnptrname) DWORD fnptrname(DWORD dwUserIndex, XINPUT_VIBRATION *pVibration)
@@ -57,14 +58,14 @@ typedef XINPUT_GET_STATE(XInputGetStatePtr);
 typedef XINPUT_SET_STATE(XInputSetStatePtr);
 
 // Be default point the pointers to stub function
-file_scope XInputGetStatePtr *MyXInputGetState = XInputGetStateStub;
-file_scope XInputSetStatePtr *MyXInputSetState = XInputSetStateStub;
+global_var XInputGetStatePtr *MyXInputGetState = XInputGetStateStub;
+global_var XInputSetStatePtr *MyXInputSetState = XInputSetStateStub;
 
 // Make the actual function calls inside our functions as calls to our function pointers
 #define XInputGetState MyXInputGetState
 #define XInputSetState MyXInputSetState
 
-file_scope void GetXInputFunctions(void)
+internal void GetXInputFunctions(void)
 {
     HMODULE xinputLib = LoadLibrary(TEXT("XInput1_4.dll"));
 
@@ -82,7 +83,7 @@ file_scope void GetXInputFunctions(void)
     }
 }
 
-file_scope void CheckXInputState(void)
+internal void CheckXInputState(void)
 {
     for(int32_t controllerIndex = 0; controllerIndex < XUSER_MAX_COUNT; ++controllerIndex)
     {
@@ -140,13 +141,13 @@ file_scope void CheckXInputState(void)
     }    
 }
 
-file_scope void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *height)
+internal void CalcWidthHeightFromRect(RECT *client_rect, int *width, int *height)
 {
     *width  = client_rect->right - client_rect->left;
     *height = client_rect->bottom - client_rect->top;
 }
 
-file_scope void RenderColorGradient(void)
+internal void RenderColorGradient(void)
 {
     // Pitch : No. of pixels to move to get from one row beginning to another row beginning
     // Stride : No of pixels to move to get from one row end to another row beginning
@@ -188,7 +189,7 @@ file_scope void RenderColorGradient(void)
     }    
 }
 
-file_scope void CreateBackBufferForNewSize(RECT *client_rect)
+internal void CreateBackBufferForNewSize(RECT *client_rect)
 {
     // if back buffer got already allocated in the previous WM_SIZE call, release that memory
     if(g_hhBackBuffer.bbMemory)
@@ -213,7 +214,7 @@ file_scope void CreateBackBufferForNewSize(RECT *client_rect)
     g_hhBackBuffer.bbMemory = VirtualAlloc(0, bitmapSizeInBytes, MEM_COMMIT, PAGE_READWRITE);
 }
 
-file_scope void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
+internal void PaintWindowFromCurrentBackBuffer(HDC windowDC, RECT *client_rect)
 {
     int32_t windowWidth;
     int32_t windowHeight;
